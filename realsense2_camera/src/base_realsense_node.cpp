@@ -1670,9 +1670,14 @@ void BaseRealSenseNode::frame_callback(rs2::frame frame)
                 clip_depth(original_depth_frame, _clipping_distance);
             }
 
+            rs2::frameset unaligned_frameset;
+
             ROS_DEBUG("num_filters: %d", static_cast<int>(_filters.size()));
             for (std::vector<NamedFilter>::const_iterator filter_it = _filters.begin(); filter_it != _filters.end(); filter_it++)
             {
+                if ((filter_it->_name == "align_to_color"))
+                    unaligned_frameset = frameset; // copy unaligned frameset
+
                 ROS_DEBUG("Applying filter: %s", filter_it->_name.c_str());
                 if ((filter_it->_name == "pointcloud") && (!original_depth_frame))
                     continue;
@@ -1730,6 +1735,8 @@ void BaseRealSenseNode::frame_callback(rs2::frame frame)
             }
             if (original_depth_frame && _align_depth)
             {
+                rs2::depth_frame original_depth_frame = unaligned_frameset.get_depth_frame();
+
                 rs2::frame frame_to_send;
                 if (_colorizer)
                     frame_to_send = _colorizer->process(original_depth_frame);
