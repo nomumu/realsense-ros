@@ -1662,22 +1662,33 @@ void BaseRealSenseNode::frame_callback(rs2::frame frame)
                             rs2_stream_to_string(stream_type), stream_index, rs2_format_to_string(stream_format), stream_unique_id, frame.get_frame_number(), frame_time, t.toNSec());
                 runFirstFrameInitialization(stream_type);
             }
-            // Clip depth_frame for max range:
+            // Post-processing filters
+            ROS_DEBUG("num_filters: %d", static_cast<int>(_filters.size()));
+            for (std::vector<NamedFilter>::const_iterator filter_it = _filters.begin(); filter_it != _filters.end(); filter_it++)
+            {
+                if ((filter_it->_name == "pointcloud") || (filter_it->_name == "align_to_color"))
+                    continue;
+                ROS_DEBUG("Applying filter: %s", filter_it->_name.c_str());
+                frameset = filter_it->_filter->process(frameset);
+            }
+            // Get depth frame without align
             rs2::depth_frame original_depth_frame = frameset.get_depth_frame();
             bool is_color_frame(frameset.get_color_frame());
+            // Clip depth_frame for max range:
             if (original_depth_frame && _clipping_distance > 0)
             {
                 clip_depth(original_depth_frame, _clipping_distance);
             }
-
-            ROS_DEBUG("num_filters: %d", static_cast<int>(_filters.size()));
+            // Other filters
             for (std::vector<NamedFilter>::const_iterator filter_it = _filters.begin(); filter_it != _filters.end(); filter_it++)
             {
-                ROS_DEBUG("Applying filter: %s", filter_it->_name.c_str());
+                if ((filter_it->_name != "pointcloud") && (filter_it->_name != "align_to_color"))
+                    continue;
                 if ((filter_it->_name == "pointcloud") && (!original_depth_frame))
                     continue;
                 if ((filter_it->_name == "align_to_color") && (!is_color_frame))
                     continue;
+                ROS_DEBUG("Applying filter: %s", filter_it->_name.c_str());
                 frameset = filter_it->_filter->process(frameset);
             }
 
